@@ -13,7 +13,7 @@ results = pd.DataFrame(columns=COLUMN_NAMES)
 urls, cleaned_urls, company_name, operator_number, address, phone, fax,emergency,lastname,firstname,email,raw = ([] for i in range(12))
 employee_detail_table = ''
 
-for i in company_ids[0:20]:
+for i in company_ids[:50]:
     payload = {'company': i,
                'company_name_number': 'number'}  # data that will be encoded as form data sent with post request
 
@@ -30,7 +30,6 @@ for link in cleaned_urls:
     get_employees_data_request = requests.get(link)
     response = str(get_employees_data_request.text)
     employee_data_response = BeautifulSoup(response, "html.parser")
-    employee_detail_table = BeautifulSoup(response,"html.parser")
 
     # convert to string and try splitting on /n & /r
     employees_data = employee_data_response.find('blockquote').text
@@ -67,12 +66,12 @@ for link in cleaned_urls:
     fax.append(strfax)
 
     # working on alternative approach for cleaning employee details
-    if employee_detail_table.text is None:
+    if employee_data_response.find('table') is None:
         lastname.append(' ')
         firstname.append(' ')
         email.append(' ')
         continue
-    raw_response = employee_detail_table.find('table').text
+    raw_response = employee_data_response.find('table').text
     try:
         employee_information = raw_response.split('Number',1)[1]
     except IndexError:
@@ -94,6 +93,10 @@ for link in cleaned_urls:
                 email.append(employee_information[i + 3])# checking for email on next index
             else: # no email was provided
                 email.append(' ')
+        elif i+1 <len(employee_information): # w'll be triggered when email is missing for employee
+            firstname.append(employee_information[i])
+            lastname.append(employee_information[i + 1])
+            email.append(' ')
 
 results[COLUMN_NAMES[0]] = company_name
 results[COLUMN_NAMES[1]] = operator_number
