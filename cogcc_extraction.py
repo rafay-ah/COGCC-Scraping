@@ -4,7 +4,10 @@ from bs4 import BeautifulSoup
 import re
 
 data = pd.read_excel('Active_Operators.xlsx')
+data = data.drop_duplicates(subset=['Operator Number'], keep="first")
 company_ids = list(data["Operator Number"])
+
+
 base_url = "https://cogcc.state.co.us/cogis/"
 
 COLUMN_NAMES = ['Company Name', 'Operator Number', 'Address', 'Phone', 'Fax', 'Emergency', 'Employee Last Name',
@@ -13,7 +16,7 @@ results = pd.DataFrame(columns=COLUMN_NAMES)
 urls, cleaned_urls, company_name, operator_number, address, phone, fax,emergency,lastname,firstname,email,raw = ([] for i in range(12))
 employee_detail_table = ''
 
-for i in company_ids[:50]:
+for i in company_ids[:25]:
     payload = {'company': i,
                'company_name_number': 'number'}  # data that will be encoded as form data sent with post request
 
@@ -56,11 +59,6 @@ for link in cleaned_urls:
             stremergency= contact.replace('EMERGENCY', '').strip()
         elif contact.__contains__('FAX'):
             strfax = contact.replace('FAX', '').strip()
-        # elif not contact.__contains__('@'): # making sure that no contact detail was provided
-        #     phone.append(' ')
-        #     emergency.append(' ')
-        #     fax.append(' ')
-        #     break
     phone.append(strphone)
     emergency.append(stremergency)
     fax.append(strfax)
