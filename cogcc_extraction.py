@@ -11,11 +11,31 @@ base_url = "https://cogcc.state.co.us/cogis/"
 
 COLUMN_NAMES = ['Company Name', 'Operator Number', 'Address', 'Phone', 'Fax', 'Emergency','Cell','Dispatch', 'Employee Last Name',
                 'Employee First Name', 'Email','Phone Type','Number']
-results = pd.DataFrame(columns=COLUMN_NAMES)
-urls, cleaned_urls, company_name, operator_number, address, phone, fax,dispatch,cell, emergency, lastname, firstname, email, phonetype,employee_number, raw,  = ([] for i in range(16))
+
+extracted_data = pd.DataFrame(columns=COLUMN_NAMES)
+urls, cleaned_urls = ([] for i in range(2))
 employee_detail_table = ''
 
-for i in company_ids[10:45]:
+
+def create_and_append_row(company_name,operator_number, address, phone, fax,emergency,cell,dispatch, firstname, lastname, email, phonetype, employee_number):
+    results = pd.DataFrame(columns=COLUMN_NAMES)
+    results[COLUMN_NAMES[0]] = company_name
+    results[COLUMN_NAMES[1]] = operator_number
+    results[COLUMN_NAMES[2]] = address
+    results[COLUMN_NAMES[3]] = phone
+    results[COLUMN_NAMES[4]] = fax
+    results[COLUMN_NAMES[5]] = emergency
+    results[COLUMN_NAMES[6]] = cell
+    results[COLUMN_NAMES[7]] = dispatch
+    results[COLUMN_NAMES[8]] = firstname
+    results[COLUMN_NAMES[9]] = lastname
+    results[COLUMN_NAMES[10]] = email
+    results[COLUMN_NAMES[11]] = phonetype
+    results[COLUMN_NAMES[12]] = employee_number
+    return results
+
+
+for i in company_ids[0:50]:
     payload = {'company': i,
                'company_name_number': 'number'}  # data that will be encoded as form data sent with post request
 
@@ -29,6 +49,8 @@ for i in company_ids[10:45]:
             cleaned_urls.append(base_url + link_tag['href'])
 
 for link in cleaned_urls:
+    company_name, operator_number, address, phone, fax, dispatch, cell, emergency, lastname, firstname, email, phonetype, employee_number, raw = ([] for i in range(14))
+
     get_employees_data_request = requests.get(link)
     response = str(get_employees_data_request.text)
     employee_data_response = BeautifulSoup(response, "lxml")
@@ -41,7 +63,7 @@ for link in cleaned_urls:
     employees_data = [x.replace('\t', '').replace('\n', '') for x in employees_data]
     # company detail cleaning
     company_name.append(str(employees_data[2]).split('\xa0')[0].strip())
-    operator_number.append(str(employees_data[2]).split('\xa0')[2].strip())
+    operator_number.append(str(employees_data[2]).split('\xa0')[2].strip().replace('#',''))
     address.append(re.sub(' +', ' ', employees_data[3]).replace('\r', ''))
 
     # cleaning company contact details
@@ -78,7 +100,10 @@ for link in cleaned_urls:
         email.append(' ')
         phonetype.append(' ')
         employee_number.append(' ')
+        extracted_data = extracted_data.append(create_and_append_row(company_name, operator_number, address, phone, fax, emergency, cell, dispatch,
+                              ' ', ' ', ' ', ' ', ' '))
         continue
+
     raw_response = employee_data_response.find('table').text
     try:
         employee_information = raw_response.split('Number', 1)[1]
@@ -89,15 +114,18 @@ for link in cleaned_urls:
         email.append(' ')
         phonetype.append(' ')
         employee_number.append(' ')
+        extracted_data = extracted_data.append(create_and_append_row(company_name, operator_number, address, phone, fax, emergency, cell, dispatch,
+                              ' ', ' ', ' ', ' ', ' '))
         continue
+
     employee_information = str(employee_information).replace('\r', '').replace('\t', '').replace('*', '').replace(
         '\xa0', ' ').strip()
     employee_information = re.sub(' +', ' ', employee_information)
     employee_information = re.sub('(\n)\\1{2,}', '\n', employee_information)
     employee_information = employee_information.split('\n')
 
-    str_firstname, str_lastname, str_email, str_phonetype, str_number = [' '] * 5
     for i in range(0, len(employee_information), 5):
+        str_firstname, str_lastname, str_email, str_phonetype, str_number = [' '] * 5
         if i + 2 <= len(employee_information) - 1:
             # extracting first_name
             if employee_information[i].isupper():
@@ -127,26 +155,18 @@ for link in cleaned_urls:
             str_firstname = str_firstname + employee_information[i] + ' '
             str_lastname = str_firstname + employee_information[i + 1] + ' '
             str_email = str_email + ' '
-            str_phonetype = str_phonetype + ' '
+            str_email = str_phonetype + ' '
             str_number = str_number + ' '
-    firstname.append(str_firstname)
-    lastname.append(str_lastname)
-    email.append(str_email)
-    phonetype.append(str_phonetype)
-    employee_number.append(str_number)
-
-results[COLUMN_NAMES[0]] = company_name
-results[COLUMN_NAMES[1]] = operator_number
-results[COLUMN_NAMES[2]] = address
-results[COLUMN_NAMES[3]] = phone
-results[COLUMN_NAMES[4]] = fax
-results[COLUMN_NAMES[5]] = emergency
-results[COLUMN_NAMES[6]] = cell
-results[COLUMN_NAMES[7]] = dispatch
-results[COLUMN_NAMES[8]] = firstname
-results[COLUMN_NAMES[9]] = lastname
-results[COLUMN_NAMES[10]] = email
-results[COLUMN_NAMES[11]] = phonetype
-results[COLUMN_NAMES[12]] = employee_number
-results["Raw HTML"] = raw
-results.to_csv('extracted_Data.csv', sep=',', encoding=False)
+        # firstname.append(str_firstname)
+        # lastname.append(str_lastname)
+        # email.append(str_email)
+        # phonetype.append(str_phonetype)
+        # employee_number.append(str_number)
+        extracted_data = extracted_data.append(create_and_append_row(company_name, operator_number, address, phone, fax, emergency, cell, dispatch, str_firstname,
+                              str_lastname, str_email, str_phonetype, str_number))
+# results["Raw HTML"] = raw
+extracted_data = extracted_data.reset_index(level=0)
+extracted_data = extracted_data.drop(columns=['index'])
+# for column in extracted_data:
+#     extracted_data[column] = extracted_data[column].str.encode('utf-8')
+extracted_data.to_excel("output.xlsx")
